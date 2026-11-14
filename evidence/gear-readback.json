@@ -1,0 +1,27 @@
+{
+  "D_initial": {
+    "gear": "DRIVE",
+    "air": "false",
+    "fan": "4",
+    "light": "80",
+    "window": "40"
+  },
+  "P_input_s": 3.06,
+  "P": {
+    "gear": "PARK",
+    "air": "true",
+    "fan": "1",
+    "light": "30",
+    "window": "0"
+  },
+  "P_read_s": 4.48,
+  "D_input_s": 7.53,
+  "D_restored": {
+    "gear": "DRIVE",
+    "air": "false",
+    "fan": "4",
+    "light": "80",
+    "window": "40"
+  },
+  "D_read_s": 8.8
+}
