@@ -14,10 +14,12 @@
 |---|---|---|
 | 오피스 마이부스 | 반경 · 11:00~14:00 · P단 | 운전석 창문 · 팬 · 공기청정 · 무드등 |
 | 심야 매너존 | 반경 · 22:00~06:00 | 공조 · 무드등 |
-| 드라이브스루 | 반경 · 상시 | 창문 · 팬 (와이퍼 작동 시 창문 개방 보류) |
+| 드라이브스루 | 반경 · 상시 · P단 | 창문 · 팬 (와이퍼 작동·미확인 시 창문 개방 보류) |
 | 하교 픽업존 | 반경 · 13:00~19:00 | 2열 창문 잠금 · 공조 |
 
-> 현재 드라이브스루에는 기어·속도 제한 조건이 없습니다. 본선에서 P단·사용자 확인 조건으로 제한할 계획입니다.
+> 드라이브스루는 P단 정차에서만 창문을 열고, P단을 벗어나면 원래 값으로 닫습니다(커밋 63ce466부터). 창문 개방 전 사용자 확인 버튼은 아직 계획 단계입니다.
+>
+> 1차 접수 기준 커밋은 `4482e7f`입니다. 시연 영상과 접수양식은 그 시점 기준이라 "현행 드라이브스루: 기어·속도 조건 없음"으로 표시되어 있습니다.
 
 ## 공개 SDK 사용처
 
@@ -35,10 +37,10 @@
 | 경로 | 내용 |
 |---|---|
 | [core/src/autozone/core/AutoZoneDomain.kt](core/src/autozone/core/AutoZoneDomain.kt) | Android 의존성 없는 순수 Kotlin 엔진: 지오펜스·시간대(자정 넘김)·P단 조건·스냅샷 저장/복원·우천 인터록·주행 제한 |
-| [core/test/autozone/core/AutoZoneDomainTest.kt](core/test/autozone/core/AutoZoneDomainTest.kt) | 도메인 단위 테스트 8개 |
+| [core/test/autozone/core/AutoZoneDomainTest.kt](core/test/autozone/core/AutoZoneDomainTest.kt) | 도메인 단위 테스트 13개 |
 | [app/src/main/java/autozone/app/PleosAutoZoneBridge.kt](app/src/main/java/autozone/app/PleosAutoZoneBridge.kt) | Pleos Connect SDK·CarUxRestrictions 어댑터 (SDK 호출은 전용 백그라운드 스레드) |
 | [app/src/main/java/autozone/app/MainActivity.kt](app/src/main/java/autozone/app/MainActivity.kt) | 차량용 화면: 홈 / 루틴 관리 / 상세 / 진단 |
-| [apk/AutoZone-debug.apk](apk/AutoZone-debug.apk) | 시연에 사용한 debug APK (서명 릴리스 APK 아님) |
+| [apk/AutoZone-debug.apk](apk/AutoZone-debug.apk) | 이 저장소 최신 소스로 빌드한 debug APK (서명 릴리스 APK 아님). 1차 접수 시점 APK는 커밋 `4482e7f`에 있음 |
 | [evidence/](evidence/) | 공식 에뮬레이터 D→P→D 재조회 원자료 |
 | [media/AutoZone-demo-39s.mp4](media/AutoZone-demo-39s.mp4) | 제출 시연 영상 (39초, 1080p) |
 
@@ -57,7 +59,16 @@
 - 화면의 "현재 설정" 표시만으로 재조회 성공을 판정하지 않았습니다.
 - 우천 화면은 창문 보류 안내와 복원 버튼 노출을 확인한 UI 검사이며, 우천 상황의 창문 값 재조회 결과가 아닙니다.
 
-**미검증:** 실차·양산 차량, App Market 배포 권한, 확대 글꼴·다른 해상도, 앱 재시작 후 위치·설정값 유지, 장시간 백그라운드 동작.
+### 드라이브스루 P단 조건 (커밋 63ce466, 같은 에뮬레이터·같은 방법)
+
+| SDK 재조회 | D로 진입 | P | 다시 D |
+|---|---:|---:|---:|
+| 운전석 창문 | 40% (열리지 않음) | 80% | 40% |
+| 공조 풍량 | 4단 | 1단 | 4단 |
+
+같은 실행에서 마이부스 D→P→D도 위 표와 같은 값으로 다시 확인했습니다. 원자료: [evidence/pt-drivethru/](evidence/pt-drivethru/).
+
+**미검증:** 실차·양산 차량, App Market 배포 권한, 확대 글꼴·다른 해상도, 앱 재시작 후 위치·설정값 유지, 장시간 백그라운드 동작, 창문 개방 전 사용자 확인.
 
 ## 개발·시연 환경
 

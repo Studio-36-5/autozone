@@ -1,0 +1,46 @@
+{
+  "booth_D": {
+    "gear": "DRIVE",
+    "air": "false",
+    "fan": "4",
+    "light": "80",
+    "window": "40"
+  },
+  "booth_P": {
+    "gear": "PARK",
+    "air": "true",
+    "fan": "1",
+    "light": "30",
+    "window": "0"
+  },
+  "booth_D_restored": {
+    "gear": "DRIVE",
+    "air": "false",
+    "fan": "4",
+    "light": "80",
+    "window": "40"
+  },
+  "dt_D": {
+    "gear": "DRIVE",
+    "air": "false",
+    "fan": "4",
+    "light": "80",
+    "window": "40"
+  },
+  "dt_D_console_window": 40,
+  "dt_P": {
+    "gear": "PARK",
+    "air": "false",
+    "fan": "1",
+    "light": "80",
+    "window": "80"
+  },
+  "dt_D_restored": {
+    "gear": "DRIVE",
+    "air": "false",
+    "fan": "4",
+    "light": "80",
+    "window": "40"
+  },
+  "passed": true
+}
