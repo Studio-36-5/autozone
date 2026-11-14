@@ -73,7 +73,7 @@ class MainActivity : Activity() {
 
         if (usePleos) {
             bridge = PleosAutoZoneBridge(this, engine) { render() }.also {
-                val initHour = if (intent.hasExtra("hour")) intent.getIntExtra("hour", 23) else null
+                val initHour = if (demoInputAllowed && intent.hasExtra("hour")) intent.getIntExtra("hour", 23) else null
                 it.overrideHour = initHour
                 if (initHour != null) {
                     engine.updateVehicleState { st -> st.copy(currentHour = initHour) }
@@ -112,7 +112,18 @@ class MainActivity : Activity() {
         registerReceiver(ctrlReceiver, IntentFilter("autozone.app.CTRL"))
     }
 
+    // Demo time/location injection (adb intent or broadcast) is accepted only in debuggable builds,
+    // so other apps cannot drive vehicle writes through the exported control receiver in a release build.
+    private val demoInputAllowed: Boolean
+        get() = (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
+
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        render()
+    }
+
     private fun handleCommandIntent(intent: Intent) {
+        if (!demoInputAllowed) return
         if (intent.hasExtra("hour")) {
             val h = intent.getIntExtra("hour", 23)
             Log.i("AutoZone", "Intent hour=$h")
@@ -346,12 +357,12 @@ class MainActivity : Activity() {
         val effects = when (selectedZone) {
             ZoneId.OFFICE_BOOTH -> listOf("창문 닫기 · 풍량 1단", "공기청정 켜기 · 무드등 30%")
             ZoneId.NIGHT_PARKING -> listOf("내기순환 · 공기청정 켜기", "무드등 10% · 하이패스 음량 0")
-            ZoneId.DRIVE_THRU -> listOf("운전석 창문 80% 개방 · 풍량 1단", "와이퍼 작동 시 창문 개방 보류")
+            ZoneId.DRIVE_THRU -> listOf("운전석 창문 80% 개방 · 풍량 1단", "와이퍼 작동·미확인 시 창문 개방 보류")
             ZoneId.SCHOOL_PICKUP -> listOf("2열 창문 잠금 · 공기청정 켜기", "풍량 2단")
         }
         effects.forEach { contentBox.addView(label(it, 32f, INK).apply { layoutParams = margin(bottom = 16) }) }
         if (selectedZone == ZoneId.DRIVE_THRU) {
-            contentBox.addView(label("현재 기어·속도 조건 없이 실행됩니다.", 28f, BRAND, true).apply { layoutParams = margin(top = 10, bottom = 20) })
+            contentBox.addView(label("P단 정차에서만 창문을 열고, P단을 벗어나면 원래대로 닫습니다.", 28f, BRAND, true).apply { layoutParams = margin(top = 10, bottom = 20) })
         }
         if (selectedZone == ZoneId.NIGHT_PARKING && (engine.state.etcsVolume ?: 0) < 0) {
             contentBox.addView(label("이 차량은 하이패스 음량 제어를 지원하지 않아요.", 28f, MUTED).apply { layoutParams = margin(bottom = 20) })

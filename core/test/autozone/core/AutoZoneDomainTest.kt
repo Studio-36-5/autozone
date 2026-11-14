@@ -150,6 +150,61 @@ fun main() {
         check(HardwareCommand.SetHvacRecirculation(true) in enterCmds) { "지원되는 공조 명령은 정상 생성되어야 함" }
     }
 
+    checkCase("드라이브스루 P단 조건: 주행(D) 진입 시 창문을 열지 않고, P단에서 개방, D단 전환 시 원래대로 닫음") {
+        val engine = AutoZoneEngine(simulation = true)
+        engine.updateVehicleState { it.copy(gear = "DRIVE", driverWindowPos = 0, hvacFanSpeed = 5, wiperActive = false) }
+        val driveCmds = engine.onLocationUpdated(37.501500, 127.031500)
+        check(driveCmds.isEmpty() && engine.activeSession == null) { "주행 중 드라이브스루가 실행되면 안 됨" }
+
+        engine.updateVehicleState { it.copy(gear = "PARK") }
+        val parkCmds = engine.onContextChanged()
+        check(HardwareCommand.SetDriverWindowPos(80) in parkCmds) { "P단 정차 시 창문 개방 누락" }
+
+        engine.updateVehicleState { it.copy(gear = "DRIVE") }
+        val restore = engine.onContextChanged()
+        check(engine.activeSession == null) { "D단 전환 시 해제 실패" }
+        check(HardwareCommand.SetDriverWindowPos(0) in restore && HardwareCommand.SetHvacFanSpeed(5) in restore) { "창문 닫힘·풍량 복원 실패" }
+    }
+
+    checkCase("와이퍼 상태 미확인(null)이면 창문 개방을 보류") {
+        val engine = AutoZoneEngine(simulation = true)
+        engine.updateVehicleState { it.copy(driverWindowPos = 0, wiperActive = null) }
+        val cmds = engine.onLocationUpdated(37.501500, 127.031500)
+        check(cmds.none { it is HardwareCommand.SetDriverWindowPos }) { "와이퍼 미확인 상태에서 창문이 열리면 안 됨" }
+        check(engine.activeSession?.safetySkippedNote?.contains("확인하지 못해") == true) { "미확인 보류 안내 누락" }
+    }
+
+    checkCase("바꿀 항목의 현재 값을 읽기 전에는 대기하고, 읽은 뒤 진입해 그 값으로 복원") {
+        val engine = AutoZoneEngine(simulation = true)
+        engine.updateVehicleState { it.copy(currentHour = 12, hvacFanSpeed = null, ambientBrightness = 70) }
+        val waitCmds = engine.onLocationUpdated(37.503400, 127.033400)
+        check(waitCmds.isEmpty() && engine.activeSession == null) { "풍량을 모르는 상태에서 실행되면 안 됨" }
+        check(engine.lastEventLog.contains("확인하는 중")) { "대기 안내 누락" }
+
+        engine.updateVehicleState { it.copy(hvacFanSpeed = 6) }
+        engine.onContextChanged()
+        check(engine.activeSession?.zone?.id == ZoneId.OFFICE_BOOTH) { "값을 읽은 뒤 진입 실패" }
+        engine.updateVehicleState { it.copy(gear = "DRIVE") }
+        val restore = engine.onContextChanged()
+        check(HardwareCommand.SetHvacFanSpeed(6) in restore && HardwareCommand.SetAmbientBrightness(70) in restore) { "읽은 원래 값으로 복원 실패" }
+    }
+
+    checkCase("루틴 A 실행 중 루틴 B로 바뀌어도 최종 복원은 사용자의 원래 값") {
+        val engine = AutoZoneEngine(simulation = true)
+        engine.updateVehicleState { it.copy(currentHour = 15, hvacFanSpeed = 5, hvacAirCleaner = false) }
+        engine.enterZone(ZoneId.SCHOOL_PICKUP, "A")  // 풍량 2단, 공기청정 켜짐
+        check(engine.state.hvacFanSpeed == 2) { "A 적용 실패" }
+        engine.enterZone(ZoneId.DRIVE_THRU, "B")     // 풍량 1단
+        val restore = engine.exitActiveZone("종료")
+        check(HardwareCommand.SetHvacFanSpeed(5) in restore) { "A의 값(2단)이 아니라 원래 값(5단)으로 복원해야 함" }
+    }
+
+    checkCase("CarUx 제한 상태를 모르면(null) 편집을 잠금") {
+        val engine = AutoZoneEngine(simulation = true)
+        engine.updateVehicleState { it.copy(uxRestricted = null) }
+        check(engine.isEditingLocked && !engine.screenModel().canRegisterHere) { "제한 상태 미확인 시 잠금 필요" }
+    }
+
     println("TOTAL: passed=$passed failed=$failed")
     if (failed > 0) kotlin.system.exitProcess(1)
 }

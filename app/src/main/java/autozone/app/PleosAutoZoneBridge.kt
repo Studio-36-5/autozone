@@ -74,6 +74,8 @@ class PleosAutoZoneBridge(
     @Volatile private var running = false
 
     private val alertIdToZone = ConcurrentHashMap<String, ZoneId>()
+    // Bumped on every geofence refresh; callbacks from older registrations are dropped.
+    @Volatile private var geofenceGeneration = 0
     private var okWrites = 0
     private var skippedUnsupported = 0
     private var fallbackWrites = 0
@@ -267,6 +269,7 @@ class PleosAutoZoneBridge(
         val enabledZones = engine.zones().filter { it.enabled }
         postIo {
             runCatching {
+                geofenceGeneration++
                 alertIdToZone.keys().toList().forEach { id ->
                     runCatching { fusedLocation.removeProximityAlert(id) }
                 }
@@ -299,7 +302,10 @@ class PleosAutoZoneBridge(
                 for (provider in listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER, "fused")) {
                     if (runCatching { lm.isProviderEnabled(provider) }.getOrDefault(false)) {
                         runCatching { lm.requestLocationUpdates(provider, 500L, 0f, androidLocListener, ioThread.looper) }
-                        runCatching { lm.getLastKnownLocation(provider) }?.getOrNull()?.let { last ->
+                        // Ignore cached fixes older than 2 minutes; they may be from a different place.
+                        runCatching { lm.getLastKnownLocation(provider) }?.getOrNull()
+                            ?.takeIf { System.currentTimeMillis() - it.time <= 120_000L }
+                            ?.let { last ->
                             postMain {
                                 val cmds = engine.onLocationUpdated(last.latitude, last.longitude)
                                 executeCommands(cmds)
@@ -322,9 +328,15 @@ class PleosAutoZoneBridge(
             zone.radiusMeters,
             setOf(ProximityTransition.ENTER, ProximityTransition.EXIT),
         )
+        val generation = geofenceGeneration
         fusedLocation.addProximityAlert(req, object : ProximityAlertListener {
             override fun onRegistered(alertId: String) {
                 postMain {
+                    if (generation != geofenceGeneration) {
+                        // Registered after a refresh replaced it (e.g. new location saved): drop the stale alert.
+                        postIo { runCatching { fusedLocation.removeProximityAlert(alertId) } }
+                        return@postMain
+                    }
                     alertIdToZone[alertId] = zone.id
                     Log.i(TAG, "ProximityAlert registered: zone=${zone.id} alertId=$alertId")
                 }
@@ -332,6 +344,7 @@ class PleosAutoZoneBridge(
 
             override fun onTransition(event: ProximityAlertEvent) {
                 postMain {
+                    if (generation != geofenceGeneration) return@postMain
                     val isEnter = event.transition == ProximityTransition.ENTER
                     Log.i(TAG, "ProximityAlert transition: zone=${zone.id} transition=${event.transition}")
                     val cmds = engine.onSdkProximityTransition(zone.id, isEnter)
@@ -513,6 +526,8 @@ class PleosAutoZoneBridge(
                                     engine.updateVehicleState { state ->
                                         updates.fold(state) { value, transform -> transform(value) }
                                     }
+                                    // A routine may have been waiting for these values before it could snapshot them.
+                                    if (engine.activeSession == null) executeCommands(engine.onContextChanged())
                                     onStateUpdated()
                                 }
                                 main.removeCallbacks(timeout)

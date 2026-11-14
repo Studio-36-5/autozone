@@ -208,8 +208,9 @@ class AutoZoneEngine(
     var lastEventLog: String = "대기 중 · 등록된 위치 반경과 시간대 조건이 맞으면 차량 설정을 자동 전환합니다"
         private set
 
+    // CarUx 상태를 모르면(null) 주행 중일 수 있으므로 편집을 잠근다(fail-closed).
     val isEditingLocked: Boolean
-        get() = state.uxRestricted == true
+        get() = state.uxRestricted != false
 
     fun zones(): List<GeoZone> = zoneMap.values.toList()
 
@@ -320,6 +321,13 @@ class AutoZoneEngine(
         if (zone.requireParkGear && state.gear != "PARK") {
             return "반경 진입 확인 · P단 정차 시 자동 실행됩니다"
         }
+        // 바꿀 항목의 현재 값을 아직 읽지 못했으면 복원 기준이 없으므로, 값을 읽을 때까지 대기한다.
+        val unknown = (zone.targetRecirculation != null && state.hvacRecirculation == null) ||
+            (zone.targetAirCleaner != null && state.hvacAirCleaner == null) ||
+            (zone.targetFanSpeed != null && state.hvacFanSpeed == null) ||
+            (zone.targetAmbientBrightness != null && state.ambientBrightness == null) ||
+            (zone.targetDriverWindowPos != null && state.driverWindowPos == null)
+        if (unknown) return "차량 현재 설정을 확인하는 중입니다"
         return null
     }
 
@@ -345,20 +353,23 @@ class AutoZoneEngine(
             }
         }
 
-        val restoreFirst = if (activeSession != null && activeSession?.zone?.id != id) {
-            buildRestoreCommands(activeSession!!, speak = false)
-        } else {
-            emptyList()
-        }
+        val previous = activeSession?.takeIf { it.zone.id != id }
+        val restoreFirst = if (previous != null) buildRestoreCommands(previous, speak = false) else emptyList()
 
+        // 다른 루틴에서 바로 넘어오면 현재 state에는 이전 루틴이 쓴 값이 들어 있으므로,
+        // 이전 루틴이 바꾼 항목은 이전 세션의 원래 값을 복원 기준으로 이어받는다.
+        val prevSnap = previous?.snapshot
+        val prevChanged = previous?.changedFields.orEmpty()
+        fun <T> base(field: ChangedField, current: T, original: HardwareSnapshot.() -> T): T =
+            if (prevSnap != null && field in prevChanged) prevSnap.original() else current
         val snap = HardwareSnapshot(
-            etcsVolume = state.etcsVolume,
-            hvacRecirculation = state.hvacRecirculation,
-            hvacAirCleaner = state.hvacAirCleaner,
-            hvacFanSpeed = state.hvacFanSpeed,
-            ambientBrightness = state.ambientBrightness,
-            driverWindowPos = state.driverWindowPos,
-            rearWindowLock = state.rearWindowLock,
+            etcsVolume = base(ChangedField.ETCS_VOLUME, state.etcsVolume) { etcsVolume },
+            hvacRecirculation = base(ChangedField.HVAC_RECIRCULATION, state.hvacRecirculation) { hvacRecirculation },
+            hvacAirCleaner = base(ChangedField.HVAC_AIR_CLEANER, state.hvacAirCleaner) { hvacAirCleaner },
+            hvacFanSpeed = base(ChangedField.HVAC_FAN_SPEED, state.hvacFanSpeed) { hvacFanSpeed },
+            ambientBrightness = base(ChangedField.AMBIENT_BRIGHTNESS, state.ambientBrightness) { ambientBrightness },
+            driverWindowPos = base(ChangedField.DRIVER_WINDOW_POS, state.driverWindowPos) { driverWindowPos },
+            rearWindowLock = base(ChangedField.REAR_WINDOW_LOCK, state.rearWindowLock) { rearWindowLock },
         )
 
         val commands = mutableListOf<HardwareCommand>()
@@ -386,8 +397,13 @@ class AutoZoneEngine(
         }
         zone.targetDriverWindowPos?.let { target ->
             val curWin = state.driverWindowPos ?: 0
-            if (target > curWin && state.wiperActive == true) {
-                safetySkip = "우천 감지(와이퍼 작동 중)로 운전석 창문 자동 개방을 보류했습니다"
+            // 와이퍼 상태를 아직 읽지 못한 경우(null)도 비가 오지 않는다고 확인된 것이 아니므로 개방을 보류한다.
+            if (target > curWin && state.wiperActive != false) {
+                safetySkip = if (state.wiperActive == true) {
+                    "우천 감지(와이퍼 작동 중)로 운전석 창문 자동 개방을 보류했습니다"
+                } else {
+                    "와이퍼 상태를 확인하지 못해 운전석 창문 자동 개방을 보류했습니다"
+                }
             } else {
                 commands += HardwareCommand.SetDriverWindowPos(target)
                 changed += ChangedField.DRIVER_WINDOW_POS
@@ -404,7 +420,7 @@ class AutoZoneEngine(
 
         val appliedLabels = commands.map { it.label }
         val ttsText = if (safetySkip != null) {
-            "${zone.title} 진입. 비가 오고 있어 창문 자동 개방은 건너뛰고 ${appliedLabels.joinToString(", ")} 설정만 적용했습니다."
+            "${zone.title} 진입. 안전을 위해 창문 자동 개방은 건너뛰고 ${appliedLabels.joinToString(", ")} 설정만 적용했습니다."
         } else {
             "${zone.title} 활성화. ${appliedLabels.joinToString(", ")} 설정을 자동 적용했습니다."
         }
@@ -446,27 +462,15 @@ class AutoZoneEngine(
     ): List<HardwareCommand> {
         val cmds = mutableListOf<HardwareCommand>()
         val snap = session.snapshot
-        if (ChangedField.DRIVER_WINDOW_POS in session.changedFields) {
-            cmds += HardwareCommand.SetDriverWindowPos(snap.driverWindowPos ?: 0)
-        }
-        if (ChangedField.ETCS_VOLUME in session.changedFields) {
-            cmds += HardwareCommand.SetEtcsVolume(snap.etcsVolume ?: 3)
-        }
-        if (ChangedField.HVAC_RECIRCULATION in session.changedFields) {
-            cmds += HardwareCommand.SetHvacRecirculation(snap.hvacRecirculation ?: false)
-        }
-        if (ChangedField.HVAC_AIR_CLEANER in session.changedFields) {
-            cmds += HardwareCommand.SetHvacAirCleaner(snap.hvacAirCleaner ?: false)
-        }
-        if (ChangedField.HVAC_FAN_SPEED in session.changedFields) {
-            cmds += HardwareCommand.SetHvacFanSpeed(snap.hvacFanSpeed ?: 3)
-        }
-        if (ChangedField.AMBIENT_BRIGHTNESS in session.changedFields) {
-            cmds += HardwareCommand.SetAmbientBrightness(snap.ambientBrightness ?: 80)
-        }
-        if (ChangedField.REAR_WINDOW_LOCK in session.changedFields) {
-            cmds += HardwareCommand.SetRearWindowLock(snap.rearWindowLock ?: false)
-        }
+        val changed = session.changedFields
+        // 진입 시 값을 읽지 못한(null) 항목은 원래 값을 모르므로 임의 기본값을 쓰지 않고 복원을 건너뛴다.
+        if (ChangedField.DRIVER_WINDOW_POS in changed) snap.driverWindowPos?.let { cmds += HardwareCommand.SetDriverWindowPos(it) }
+        if (ChangedField.ETCS_VOLUME in changed) snap.etcsVolume?.let { cmds += HardwareCommand.SetEtcsVolume(it) }
+        if (ChangedField.HVAC_RECIRCULATION in changed) snap.hvacRecirculation?.let { cmds += HardwareCommand.SetHvacRecirculation(it) }
+        if (ChangedField.HVAC_AIR_CLEANER in changed) snap.hvacAirCleaner?.let { cmds += HardwareCommand.SetHvacAirCleaner(it) }
+        if (ChangedField.HVAC_FAN_SPEED in changed) snap.hvacFanSpeed?.let { cmds += HardwareCommand.SetHvacFanSpeed(it) }
+        if (ChangedField.AMBIENT_BRIGHTNESS in changed) snap.ambientBrightness?.let { cmds += HardwareCommand.SetAmbientBrightness(it) }
+        if (ChangedField.REAR_WINDOW_LOCK in changed) snap.rearWindowLock?.let { cmds += HardwareCommand.SetRearWindowLock(it) }
         if (speak) {
             val msg = if (reason.contains("원터치")) {
                 "원래 차량 설정으로 즉시 되돌렸습니다."
@@ -600,11 +604,13 @@ class AutoZoneEngine(
             GeoZone(
                 id = ZoneId.DRIVE_THRU,
                 title = "드라이브스루 · 주차권 패스존",
-                summary = "반경 45m 진입 → 운전석 창문 80% 개방(우천 시 보류) · 주문용 팬 1단 감속",
+                summary = "반경 45m + P단 정차 → 운전석 창문 80% 개방(우천·와이퍼 미확인 시 보류) · 주문용 팬 1단 감속",
                 latitude = 37.501500,
                 longitude = 127.031500,
                 radiusMeters = 45f,
                 timeWindow = null,
+                // 주행 중 창문 자동 개방을 막기 위해 P단 정차에서만 실행하고, P단 해제 시 복원한다.
+                requireParkGear = true,
                 targetDriverWindowPos = 80,
                 targetFanSpeed = 1,
             ),

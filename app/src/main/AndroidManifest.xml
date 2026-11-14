@@ -29,6 +29,7 @@
         <uses-library android:name="android.car" android:required="false" />
         <activity
             android:name=".MainActivity"
+            android:configChanges="uiMode|orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation"
             android:exported="true"
             android:theme="@android:style/Theme.DeviceDefault.Light.NoActionBar">
             <!-- Pleos 주행 규제 개발 가이드: DO 선언 후 CarUxRestrictionsManager로 주행 중 편집 UI를 직접 잠금 -->
