@@ -59,6 +59,18 @@
 
 **미검증:** 실차·양산 차량, App Market 배포 권한, 확대 글꼴·다른 해상도, 앱 재시작 후 위치·설정값 유지, 장시간 백그라운드 동작.
 
+## 개발·시연 환경
+
+| 항목 | 값 |
+|---|---|
+| 에뮬레이터 | Pleos Connect 에뮬레이터 AVD `Pleos_Connect_API_34` (장치 프로필 `Pleos_Connect_v2_0`) |
+| 시스템 이미지 | Android 14 (API 34) Automotive x86_64, 42dot Inc. 시스템 이미지 Revision 1 |
+| 화면 규격 | 2560×1440, 160dpi (앱 창은 멀티윈도우 1682×1210에 맞춰 검토) |
+| SDK | Vehicle 2.3.2, vehicle-data 1.1.11, FusedLocation 1.1.3, TextToSpeech 3.3.1 |
+| 빌드 | JDK 17, compileSdk/targetSdk 34, minSdk 28 |
+
+실제 차량 없이 위 에뮬레이터와 Virtual Console로 시험했습니다. API 키 등 비밀값은 사용하지 않습니다.
+
 ## 빌드와 테스트
 
 필요: JDK 17, Android SDK(API 34). Pleos SDK는 [settings.gradle.kts](settings.gradle.kts)의 Pleos Playground Maven 저장소에서 받습니다.
