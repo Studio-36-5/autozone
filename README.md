@@ -97,4 +97,4 @@
 powershell -ExecutionPolicy Bypass -File scripts/run-core.ps1
 ```
 
-시연 시각은 실행 인텐트의 `hour` 값으로 고정하고(예: `adb shell am start -n autozone.app/.MainActivity --ei hour 12`), 기어·속도·와이퍼는 에뮬레이터 Virtual Console로 바꿉니다. 배포용 빌드에서는 시연 입력 경로를 분리할 계획입니다.
+시연 시각은 실행 인텐트의 `hour` 값으로 고정하고(예: `adb shell am start -n autozone.app/.MainActivity --ei hour 12`), 기어·속도·와이퍼는 에뮬레이터 Virtual Console로 바꿉니다. 시연 입력(시각·위치 인텐트)은 debuggable 빌드에서만 받으며, 릴리스 빌드에서는 무시합니다(`MainActivity.demoInputAllowed`).
