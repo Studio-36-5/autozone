@@ -42,7 +42,7 @@
 | [app/src/main/java/autozone/app/MainActivity.kt](app/src/main/java/autozone/app/MainActivity.kt) | 차량용 화면: 홈 / 루틴 관리 / 상세 / 진단 |
 | [apk/AutoZone-debug.apk](apk/AutoZone-debug.apk) | 이 저장소 최신 소스로 빌드한 debug APK (서명 릴리스 APK 아님). 1차 접수 시점 APK는 커밋 `4482e7f`에 있음 |
 | [evidence/](evidence/) | 공식 에뮬레이터 D→P→D 재조회 원자료 |
-| [media/AutoZone-demo-60s.mp4](media/AutoZone-demo-60s.mp4) | 제출 시연 영상 (60초, 1080p, AI 나레이션 포함) |
+| [media/AutoZone-demo-60s.mp4](media/AutoZone-demo-60s.mp4) | 제출 시연 영상 (60초, 1080p, AI 나레이션·자막 포함) |
 
 ## 검증 결과 (공식 Pleos_Connect_API_34 에뮬레이터)
 
