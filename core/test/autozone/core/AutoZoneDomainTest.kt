@@ -199,6 +199,24 @@ fun main() {
         check(HardwareCommand.SetHvacFanSpeed(5) in restore) { "A의 값(2단)이 아니라 원래 값(5단)으로 복원해야 함" }
     }
 
+    checkCase("마이부스 D단 복원: 비가 오거나(와이퍼 작동) 와이퍼 상태를 모르면 창문을 다시 열지 않고 나머지만 복원") {
+        for (wiper in listOf<Boolean?>(true, null)) {
+            val engine = AutoZoneEngine(simulation = true)
+            engine.updateVehicleState {
+                it.copy(currentHour = 12, gear = "DRIVE", driverWindowPos = 40, hvacFanSpeed = 4, ambientBrightness = 80, wiperActive = false)
+            }
+            engine.onLocationUpdated(37.503400, 127.033400)
+            engine.updateVehicleState { it.copy(gear = "PARK") }
+            engine.onContextChanged()
+            check(engine.activeSession?.zone?.id == ZoneId.OFFICE_BOOTH && engine.state.driverWindowPos == 0) { "마이부스 진입 실패" }
+            engine.updateVehicleState { it.copy(gear = "DRIVE", wiperActive = wiper) }
+            val restore = engine.onContextChanged()
+            check(restore.none { it is HardwareCommand.SetDriverWindowPos }) { "와이퍼=$wiper 인데 창문을 다시 엶" }
+            check(HardwareCommand.SetHvacFanSpeed(4) in restore && HardwareCommand.SetAmbientBrightness(80) in restore) { "나머지 항목 복원 누락" }
+            check(restore.any { it is HardwareCommand.SpeakTts && it.text.contains("창문은 닫힌 상태") }) { "창문 보류 안내 누락" }
+        }
+    }
+
     checkCase("CarUx 제한 상태를 모르면(null) 편집을 잠금") {
         val engine = AutoZoneEngine(simulation = true)
         engine.updateVehicleState { it.copy(uxRestricted = null) }

@@ -14,10 +14,10 @@
 |---|---|---|
 | 오피스 마이부스 | 반경 · 11:00~14:00 · P단 | 운전석 창문 · 팬 · 공기청정 · 무드등 |
 | 심야 매너존 | 반경 · 22:00~06:00 | 공조 · 무드등 |
-| 드라이브스루 | 반경 · 상시 · P단 | 창문 · 팬 (와이퍼 작동·미확인 시 창문 개방 보류) |
+| 드라이브스루 | 반경 · 상시 · P단 | 창문 · 팬 (와이퍼 작동·미확인 시 적용·복원 모두 창문 개방 보류) |
 | 하교 픽업존 | 반경 · 13:00~19:00 | 2열 창문 잠금 · 공조 |
 
-> 드라이브스루는 P단 정차에서만 창문을 열고, P단을 벗어나면 원래 값으로 닫습니다(커밋 63ce466부터). 창문 개방 전 사용자 확인 버튼은 아직 계획 단계입니다.
+> 드라이브스루는 P단 정차에서만 창문을 열고, P단을 벗어나면 열기 전 위치로 되돌립니다(커밋 63ce466부터). 창문 개방 전 사용자 확인 버튼은 아직 계획 단계입니다.
 >
 > 시연 영상의 앱 화면은 모두 이 빌드를 공식 에뮬레이터에서 실행한 실제 녹화입니다. 차량 장면마다 실제 앱 화면(녹화 또는 해당 값·루틴을 표시한 녹화 프레임)을 옆에 함께 보여 주며, 기어 변경·풍량·무드등·공기청정·창문과 루틴 장면의 차량 영상은 Google Flow(Veo 3.1)로 만든 AI 연출(실제 차량 촬영 아님), 위치 지도는 OpenAI 이미지 생성으로 만든 예시 지도, 나레이션은 ElevenLabs AI 음성이며, 화면에 표시한 값은 Vehicle SDK로 다시 읽은 값입니다. 녹화 시점과 재조회 결과: [evidence/video-v9/](evidence/video-v9/).
 
@@ -37,7 +37,7 @@
 | 경로 | 내용 |
 |---|---|
 | [core/src/autozone/core/AutoZoneDomain.kt](core/src/autozone/core/AutoZoneDomain.kt) | Android 의존성 없는 순수 Kotlin 엔진: 지오펜스·시간대(자정 넘김)·P단 조건·스냅샷 저장/복원·우천 인터록·주행 제한 |
-| [core/test/autozone/core/AutoZoneDomainTest.kt](core/test/autozone/core/AutoZoneDomainTest.kt) | 도메인 단위 테스트 13개 |
+| [core/test/autozone/core/AutoZoneDomainTest.kt](core/test/autozone/core/AutoZoneDomainTest.kt) | 도메인 단위 테스트 14개 |
 | [app/src/main/java/autozone/app/PleosAutoZoneBridge.kt](app/src/main/java/autozone/app/PleosAutoZoneBridge.kt) | Pleos Connect SDK·CarUxRestrictions 어댑터 (SDK 호출은 전용 백그라운드 스레드) |
 | [app/src/main/java/autozone/app/MainActivity.kt](app/src/main/java/autozone/app/MainActivity.kt) | 차량용 화면: 홈 / 루틴 관리 / 상세 / 진단 |
 | [apk/AutoZone-debug.apk](apk/AutoZone-debug.apk) | 이 저장소 최신 소스로 빌드한 debug APK (서명 릴리스 APK 아님). 1차 접수 시점 APK는 커밋 `4482e7f`에 있음 |
@@ -57,6 +57,7 @@
 
 - 원자료: [evidence/gear-readback.json](evidence/gear-readback.json), [evidence/gear-e2e-readback.log](evidence/gear-e2e-readback.log) (`READBACK` 줄), [evidence/gear-ddp-raw.mp4](evidence/gear-ddp-raw.mp4) (원본 녹화).
 - 화면의 "현재 설정" 표시만으로 재조회 성공을 판정하지 않았습니다.
+- 복원 시 우천 확인(와이퍼 작동·미확인이면 창문을 다시 열지 않음)은 2026-11-15 마감 직전 추가했고 단위 테스트로만 확인했습니다. 위 재조회 표는 맑음(와이퍼 정지) 조건의 이전 빌드 결과입니다.
 - 우천 화면은 창문 보류 안내와 복원 버튼 노출을 확인한 UI 검사이며, 우천 상황의 창문 값 재조회 결과가 아닙니다.
 
 ### 드라이브스루 P단 조건 (커밋 63ce466, 같은 에뮬레이터·같은 방법)

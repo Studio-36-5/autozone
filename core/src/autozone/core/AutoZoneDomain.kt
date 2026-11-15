@@ -464,7 +464,13 @@ class AutoZoneEngine(
         val snap = session.snapshot
         val changed = session.changedFields
         // 진입 시 값을 읽지 못한(null) 항목은 원래 값을 모르므로 임의 기본값을 쓰지 않고 복원을 건너뛴다.
-        if (ChangedField.DRIVER_WINDOW_POS in changed) snap.driverWindowPos?.let { cmds += HardwareCommand.SetDriverWindowPos(it) }
+        // 적용 경로와 같은 안전 규칙: 복원이 창문을 다시 여는 방향이면 와이퍼가 정지로 확인된 경우에만 연다.
+        var windowHeld = false
+        if (ChangedField.DRIVER_WINDOW_POS in changed) snap.driverWindowPos?.let { target ->
+            val curWin = state.driverWindowPos ?: 0
+            if (target > curWin && state.wiperActive != false) windowHeld = true
+            else cmds += HardwareCommand.SetDriverWindowPos(target)
+        }
         if (ChangedField.ETCS_VOLUME in changed) snap.etcsVolume?.let { cmds += HardwareCommand.SetEtcsVolume(it) }
         if (ChangedField.HVAC_RECIRCULATION in changed) snap.hvacRecirculation?.let { cmds += HardwareCommand.SetHvacRecirculation(it) }
         if (ChangedField.HVAC_AIR_CLEANER in changed) snap.hvacAirCleaner?.let { cmds += HardwareCommand.SetHvacAirCleaner(it) }
@@ -477,7 +483,8 @@ class AutoZoneEngine(
             } else {
                 "${session.zone.title} 조건이 해제되어 진입 전 차량 설정으로 복원했습니다."
             }
-            cmds += HardwareCommand.SpeakTts(msg)
+            val held = if (windowHeld) " 비가 오거나 와이퍼 상태를 확인하지 못해 운전석 창문은 닫힌 상태로 두었습니다." else ""
+            cmds += HardwareCommand.SpeakTts(msg + held)
         }
         return cmds
     }
